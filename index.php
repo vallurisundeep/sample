@@ -20,9 +20,9 @@ $importer = new ImportData($connection);
 $tableName = 'employee';
 
 // Specify the path to the Excel file
-$excelFilePath = 'data/data.xlsx';
+$FilePath = 'data/data.txt';
 
 // Import data from Excel file in batches
-$importer->insertBatch($tableName, $excelFilePath);
+$importer->insertBatch($tableName, $FilePath);
 
 echo "Data imported successfully!";

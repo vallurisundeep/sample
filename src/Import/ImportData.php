@@ -1,6 +1,7 @@
 <?php
 namespace App\Import;
 
+use PhpOffice\PhpSpreadsheet\IOFactory;
 class ImportData
 {
     private $connection;
@@ -12,55 +13,58 @@ class ImportData
     }
 
     // Method to perform batch data insertion
-    public function insertBatch($tableName, $excelFilePath, $batchSize = 2000)
+    public function insertBatch($tableName, $FilePath, $batchSize = 2000)
     {
-        // Open the Excel file
-        $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($excelFilePath);
-        $worksheet = $spreadsheet->getActiveSheet();
+        try {
+            // Open the Excel file
+            $spreadsheet = IOFactory::load($FilePath);
+            $worksheet = $spreadsheet->getActiveSheet();
 
-        // Total rows in the Excel file
-        $totalRows = $worksheet->getHighestRow();
+            // Total rows in the Excel file
+            $totalRows = $worksheet->getHighestRow();
 
-        // Prepare insert query
-        $insertQuery = "INSERT INTO $tableName (create_time, first_name, last_name, country, phone) VALUES (?, ?, ?, ?, ?)";
-        
-        // Initialize data array for batch insertion
-        $batchData = [];
+            // Prepare insert query
+            $insertQuery = "INSERT INTO $tableName (vin, make, nameplate, country) VALUES (?, ?, ?, ?)";
 
-        // Loop through rows and accumulate data for insertion
-        for ($row = 2; $row <= $totalRows; $row++) {
-            // Start from the second row
-            // Generate current timestamp for create_time
-            $create_time = date('Y-m-d H:i:s');
+            // Initialize data array for batch insertion
+            $batchData = [];
 
-            // Fetch data from Excel file
-            $first_name = $worksheet->getCell('A' . $row)->getValue(); // Assuming first_name is in column A
-            $last_name = $worksheet->getCell('B' . $row)->getValue(); // Assuming last_name is in column B
-            $country = $worksheet->getCell('C' . $row)->getValue(); // Assuming country is in column C
-            $phone = $worksheet->getCell('D' . $row)->getValue(); // Assuming phone is in column D
+            // Loop through rows and accumulate data for insertion
+            for ($row = 2; $row <= $totalRows; $row++) {
+                // Fetch data from Excel file
+                $vin = $worksheet->getCell('A' . $row)->getValue(); // Assuming VIN is in column A
+                $make = $worksheet->getCell('B' . $row)->getValue(); // Assuming Make is in column B
+                $nameplate = $worksheet->getCell('C' . $row)->getValue(); // Assuming Nameplate is in column C
+                $country = $worksheet->getCell('D' . $row)->getValue(); // Assuming Country is in column D
 
-            // Prepare the data for insertion
-            $rowData = [$create_time, $first_name, $last_name, $country, $phone];
+                // Prepare the data for insertion
+                $rowData = [$vin, $make, $nameplate, $country];
 
-            // Accumulate data for batch insertion
-            $batchData[] = $rowData;
+                // Accumulate data for batch insertion
+                $batchData[] = $rowData;
 
-            // Insert data in batches
-            if (count($batchData) == $batchSize || $row === $totalRows) {
-                // Execute the insert query for the current batch
-                $stmt = $this->connection->prepare($insertQuery);
-                if (!$stmt) {
-                    die('Prepare failed: ' . htmlspecialchars($this->connection->error));
+                // Insert data in batches
+                if (count($batchData) == $batchSize || $row === $totalRows) {
+                    // Execute the insert query for the current batch
+                    $stmt = $this->connection->prepare($insertQuery);
+                    if (!$stmt) {
+                        throw new \Exception('Prepare failed: ' . htmlspecialchars($this->connection->error));
+                    }
+
+                    foreach ($batchData as $rowData) {
+                        $stmt->bind_param("ssss", ...$rowData);
+                        if (!$stmt->execute()) {
+                            throw new \Exception('Execute failed: ' . htmlspecialchars($stmt->error));
+                        }
+                    }
+
+                    // Reset batch data for the next batch
+                    $batchData = [];
                 }
-                
-                foreach ($batchData as $rowData) {
-                    $stmt->bind_param("sssss", ...$rowData);
-                    $stmt->execute();
-                }
-
-                // Reset batch data for the next batch
-                $batchData = [];
             }
+        } catch (\Exception $e) {
+            // Handle exceptions
+            die('Error: ' . $e->getMessage());
         }
     }
 }
