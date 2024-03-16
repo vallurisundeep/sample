@@ -19,7 +19,7 @@ $connection = $database->getConnection();
 $tableName = 'employee';
 
 // Specify the path to the text file
-$filePath = 'data/data.txt';
+$filePath = 'data/test.txt';
 
 // Open the text file for reading
 $file = fopen($filePath, "r");
@@ -32,7 +32,26 @@ if ($file) {
     // Initialize a counter for inserted rows
     $totalInserted = 0;
 
-    // Read the file line by line
+    // Read the first line to get the first record
+    $firstLine = fgets($file);
+    $firstData = explode("|", $firstLine);
+    $firstData = array_map('trim', $firstData);
+
+    // Insert the first record into the history table
+    $firstVin = $firstData[0];
+    $firstMake = $firstData[1]; // Assuming make is the second column
+    $firstNameplate = $firstData[2]; // Assuming nameplate is the third column
+    $firstCountry = $firstData[3]; // Assuming country is the fourth column
+    $historyQuery = "INSERT INTO history_table (first_vin, last_vin, timestamp, make, nameplate, country) VALUES (?, ?, NOW(), ?, ?, ?)";
+    $stmt = $connection->prepare($historyQuery);
+    $stmt->bind_param("sssss", $firstVin, $firstVin, $firstMake, $firstNameplate, $firstCountry);
+    $stmt->execute();
+    $stmt->close();
+
+    // Initialize a variable to store the last inserted VIN
+    $lastInsertedVin = $firstVin;
+
+    // Read the file line by line, starting from the second line
     while (!feof($file)) {
         // Read lines in chunks
         $chunkData = [];
@@ -64,13 +83,22 @@ if ($file) {
                 list($vin, $make, $nameplate, $country) = $row;
                 $stmt->execute();
                 $totalInserted++;
+                $lastInsertedVin = $vin; // Update the last inserted VIN
             }
 
             // Close the statement
             $stmt->close();
-
+            // Update the last VIN in the history table
+            $updateLastVinQuery = "UPDATE history_table SET last_vin = ?, make = ?, nameplate = ?, country = ? WHERE first_vin = ?";
+            $stmt = $connection->prepare($updateLastVinQuery);
+            $stmt->bind_param("sssss", $lastInsertedVin, $make, $nameplate, $country, $firstVin);
+            $stmt->execute();
+            $stmt->close();
             // Notify user about the progress
             echo "Inserted $totalInserted rows.\n";
+            sleep(5);
+
+            
         }
     }
 
