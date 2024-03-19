@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Import;
 
 class ImportData {
@@ -12,14 +13,11 @@ class ImportData {
         $this->connection = $connection;
     }
 
-    public function importFromFile($filePath) {
+    public function importFromFile($filePath, $batchSize = 2000) {
         $file = fopen($filePath, "r");
 
         if ($file) {
-            // Chunk size for data insertion
-            $chunkSize = 2000; // Adjust as needed
-
-            // Initialize a counter for inserted rows
+            // Initialize a counter for total inserted rows
             $totalInserted = 0;
 
             // Initialize variables to store first and last VIN
@@ -30,7 +28,11 @@ class ImportData {
             fgets($file);
 
             // Read the file line by line
+            $batchCounter = 0;
             while (($line = fgets($file)) !== false) {
+                // Increment batch counter
+                $batchCounter++;
+
                 // Explode the line to get individual data elements
                 $data = explode("|", $line);
 
@@ -58,6 +60,11 @@ class ImportData {
                         $firstVin = $vin;
                     }
                 }
+
+                // If batch counter reaches the batch size, output progress and reset counters
+                if ($totalInserted % $batchSize === 0) {
+                    echo "Inserted $totalInserted rows so far.\n";
+                }
             }
 
             // Close the file
@@ -67,6 +74,9 @@ class ImportData {
             $this->insertHistory($firstVin, $lastVin, $make, $nameplate, $country);
 
             // Notify user about the progress
+            echo "Data imported successfully! Total rows inserted: $totalInserted";
+
+            // Return total inserted rows
             return $totalInserted;
         } else {
             return 0;

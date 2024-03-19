@@ -18,7 +18,7 @@ $tableName = 'employee';
 $historyTableName = 'history_table';
 
 // Specify the path to the text file
-$filePath = 'data/test.txt';
+$filePath = 'data/data.txt';
 
 // Create an instance of ImportData
 $importData = new ImportData($tableName, $historyTableName, $connection);
