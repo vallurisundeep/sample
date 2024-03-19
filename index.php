@@ -42,7 +42,7 @@ if ($file) {
     $firstMake = $firstData[1]; // Assuming make is the second column
     $firstNameplate = $firstData[2]; // Assuming nameplate is the third column
     $firstCountry = $firstData[3]; // Assuming country is the fourth column
-    $historyQuery = "INSERT INTO history_table (first_vin, last_vin, timestamp, make, nameplate, country) VALUES (?, ?, NOW(), ?, ?, ?)";
+    $historyQuery = "INSERT INTO history_table (first_vin, last_vin, make, nameplate, country, created_at, updated_at) VALUES (?, ?, ?, ?, ?,NOW(), NOW())";
     $stmt = $connection->prepare($historyQuery);
     $stmt->bind_param("sssss", $firstVin, $firstVin, $firstMake, $firstNameplate, $firstCountry);
     $stmt->execute();
@@ -89,11 +89,13 @@ if ($file) {
             // Close the statement
             $stmt->close();
             // Update the last VIN in the history table
-            $updateLastVinQuery = "UPDATE history_table SET last_vin = ?, make = ?, nameplate = ?, country = ? WHERE first_vin = ?";
+            $updateLastVinQuery = "UPDATE history_table SET last_vin = ?, make = ?, nameplate = ?, country = ?, updated_at = ? WHERE first_vin = ?";
             $stmt = $connection->prepare($updateLastVinQuery);
-            $stmt->bind_param("sssss", $lastInsertedVin, $make, $nameplate, $country, $firstVin);
+            $updated_at = date('Y-m-d H:i:s');
+            $stmt->bind_param("ssssss", $lastInsertedVin, $make, $nameplate, $country, $updated_at, $firstVin);
             $stmt->execute();
             $stmt->close();
+            
             // Notify user about the progress
             echo "Inserted $totalInserted rows.\n";
             sleep(5);
