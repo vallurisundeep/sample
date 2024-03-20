@@ -32,6 +32,9 @@ class ImportData {
             // Start a transaction
             $this->connection->begin_transaction();
     
+            // Skip the header row
+            fgets($file);
+    
             // Read the file line by line
             while (!feof($file)) {
                 // Read lines in chunks
@@ -54,30 +57,33 @@ class ImportData {
                 // Insert data into the employee table if chunk is not empty
                 if (!empty($chunkData)) {
                     // Insert data into the employee table
-                    $insertEmployeeQuery = "INSERT INTO {$this->tableName} (vin, make, nameplate, country) VALUES (?, ?, ?, ?)";
+                    $insertEmployeeQuery = "INSERT INTO {$this->tableName} (vin, make, nameplate, country, create_time) VALUES (?, ?, ?, ?, ?)";
                     $stmtEmployee = $this->connection->prepare($insertEmployeeQuery);
+                    $createdAt = date('Y-m-d H:i:s');
     
                     // Bind parameters for employee table
-                    $stmtEmployee->bind_param("ssss", $vin, $make, $nameplate, $country);
+                    $stmtEmployee->bind_param("sssss", $vin, $make, $nameplate, $country, $createdAt);
                     foreach ($chunkData as $row) {
                         list($vin, $make, $nameplate, $country) = $row;
-                    
+    
                         if (!$stmtEmployee->execute()) {
                             // Handle error
                             echo "Error: " . $stmtEmployee->error;
                         } else {
                             $totalInserted++;
-                    
+    
                             // Display progress message
-                            echo "Inserted $totalInserted rows.\n";
-                    
+                            echo "Processed $totalInserted rows.\n";
+    
                             // Check if it's the first record and update history table
                             if ($firstRecord === null) {
                                 $firstRecord = $row;
+                                $createdAt = date('Y-m-d H:i:s');
+    
                                 // Insert data into the history table for the first time
-                                $insertHistoryQuery = "INSERT INTO {$this->historyTableName} (first_vin, last_vin, make, nameplate, country) VALUES (?, ?, ?, ?, ?)";
+                                $insertHistoryQuery = "INSERT INTO {$this->historyTableName} (first_vin, last_vin, make, nameplate, country, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)";
                                 $stmtHistory = $this->connection->prepare($insertHistoryQuery);
-                                $stmtHistory->bind_param("sssss", $vin, $vin, $make, $nameplate, $country); // Note: first_vin and last_vin are the same for the first record
+                                $stmtHistory->bind_param("sssssss", $vin, $vin, $make, $nameplate, $country,  $createdAt, $createdAt); // Note: first_vin and last_vin are the same for the first record
                                 if (!$stmtHistory->execute()) {
                                     // Handle error
                                     echo "Error: " . $stmtHistory->error;
@@ -94,23 +100,25 @@ class ImportData {
                                 }
                                 $stmtUpdateHistory->close();
                             }
-                            $this->connection->commit();
-
                         }
                     }
                     // Close the employee table statement
                     $stmtEmployee->close();
                 }
-
             }
             // Close the file
             fclose($file);
-           
-
+    
+            // Commit the transaction
+            $this->connection->commit();
+    
+            // Notify about the progress
+            echo "Data imported successfully! Total rows inserted: $totalInserted";
+    
         } else {
             echo "Error opening the file.";
         }
-        
+    
         return $totalInserted;
     }
     
