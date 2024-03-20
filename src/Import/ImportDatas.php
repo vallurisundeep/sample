@@ -2,7 +2,7 @@
 
 namespace App\Import;
 
-class ImportData {
+class ImportDatas {
     private $tableName;
     private $historyTableName;
     private $connection;
@@ -59,58 +59,70 @@ class ImportData {
     
                     // Bind parameters for employee table
                     $stmtEmployee->bind_param("ssss", $vin, $make, $nameplate, $country);
+    
                     foreach ($chunkData as $row) {
                         list($vin, $make, $nameplate, $country) = $row;
-                    
                         if (!$stmtEmployee->execute()) {
                             // Handle error
                             echo "Error: " . $stmtEmployee->error;
                         } else {
                             $totalInserted++;
-                    
-                            // Display progress message
-                            echo "Inserted $totalInserted rows.\n";
-                    
-                            // Check if it's the first record and update history table
-                            if ($firstRecord === null) {
-                                $firstRecord = $row;
-                                // Insert data into the history table for the first time
-                                $insertHistoryQuery = "INSERT INTO {$this->historyTableName} (first_vin, last_vin, make, nameplate, country) VALUES (?, ?, ?, ?, ?)";
-                                $stmtHistory = $this->connection->prepare($insertHistoryQuery);
-                                $stmtHistory->bind_param("sssss", $vin, $vin, $make, $nameplate, $country); // Note: first_vin and last_vin are the same for the first record
-                                if (!$stmtHistory->execute()) {
-                                    // Handle error
-                                    echo "Error: " . $stmtHistory->error;
-                                }
-                                $stmtHistory->close();
-                            } else {
-                                // Update the history table for subsequent records
-                                $updateHistoryQuery = "UPDATE {$this->historyTableName} SET last_vin = ? WHERE first_vin = ?";
-                                $stmtUpdateHistory = $this->connection->prepare($updateHistoryQuery);
-                                $stmtUpdateHistory->bind_param("ss", $vin, $firstRecord[0]); // Update last_vin where first_vin matches
-                                if (!$stmtUpdateHistory->execute()) {
-                                    // Handle error
-                                    echo "Error: " . $stmtUpdateHistory->error;
-                                }
-                                $stmtUpdateHistory->close();
+                        }
+    
+                        // Keep track of the last inserted record
+                        $lastRecord = $row;
+    
+                        // Display progress message
+                        echo "Inserted $totalInserted rows.\n";
+    
+                        // Check if it's the first record and update history table
+                        if ($firstRecord === null) {
+                            $firstRecord = $row;
+                            // Insert data into the history table for the first time
+                            $insertHistoryQuery = "INSERT INTO {$this->historyTableName} (first_vin, last_vin, make, nameplate, country) VALUES (?, ?, ?, ?, ?)";
+                            $stmtHistory = $this->connection->prepare($insertHistoryQuery);
+                            $stmtHistory->bind_param("sssss", $vin, $vin, $make, $nameplate, $country); // Note: first_vin and last_vin are the same for the first record
+                            if (!$stmtHistory->execute()) {
+                                // Handle error
+                                echo "Error: " . $stmtHistory->error;
                             }
-                            $this->connection->commit();
-
+                            $stmtHistory->close();
                         }
                     }
+    
                     // Close the employee table statement
                     $stmtEmployee->close();
                 }
-
             }
+    
             // Close the file
             fclose($file);
-           
-
+    
+            // Store the last record in the history table
+            if (!empty($lastRecord)) {
+                list($lastVin, $lastMake, $lastNameplate, $lastCountry) = $lastRecord; // Last record
+    
+                // Update the last record in the history table
+                $updateHistoryQuery = "UPDATE {$this->historyTableName} SET last_vin = ? WHERE first_vin = ?";
+                $stmtUpdateHistory = $this->connection->prepare($updateHistoryQuery);
+                $stmtUpdateHistory->bind_param("ss", $lastVin, $firstRecord[0]); // Update last_vin where first_vin matches
+                if (!$stmtUpdateHistory->execute()) {
+                    // Handle error
+                    echo "Error: " . $stmtUpdateHistory->error;
+                }
+                $stmtUpdateHistory->close();
+    
+                echo "Data imported successfully!";
+            } else {
+                echo "No data to import.";
+            }
+    
+            // Commit the transaction
+            $this->connection->commit();
         } else {
             echo "Error opening the file.";
         }
-        
+    
         return $totalInserted;
     }
     

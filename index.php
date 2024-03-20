@@ -4,6 +4,7 @@ require_once __DIR__ . '/vendor/autoload.php';
 use Dotenv\Dotenv;
 use App\Config\Database;
 use App\Import\ImportData;
+use App\Import\ImportDatas;
 
 // Load environment variables from .env file
 $dotenv = Dotenv::createImmutable(__DIR__);
@@ -18,10 +19,10 @@ $tableName = 'employee';
 $historyTableName = 'history_table';
 
 // Specify the path to the text file
-$filePath = 'data/data.txt';
+$filePath = 'data/test.txt';
 
 // Create an instance of ImportData
-$importData = new ImportData($tableName, $historyTableName, $connection);
+$importData = new ImportDatas($tableName, $historyTableName, $connection);
 
 // Import data from file
 $totalInserted = $importData->importFromFile($filePath);
